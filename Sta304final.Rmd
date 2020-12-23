@@ -1,0 +1,317 @@
+---
+title: 'Competition for Ad Revenues and Its Affect on Newspaper Pricing '
+author: "Tanya"
+date: "20/12/2020"
+git link: https://github.com/twolosha/SAT304-PS5
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("huxtable")
+```
+
+## R Markdown
+
+```{r SETUP, echo=FALSE, message=FALSE, warning=FALSE}
+library(haven)
+dat <- read_dta("Angelucci_Cage_AEJMicro_dataset.dta")
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(huxtable)
+
+```
+
+
+abstract: |
+  | The newspaper industry is in peril with the number of other news sources and several outlets competing for ad revenue. To help survive that fierce atmosphere, Charles Angelucci and Julia Cage have created an ordinary least squares model using a manufactured data set from French historical newspaper archives. This paper aims to recreate the aforementioned author's work which focused on the negative affect of the introduction of television ads had on newspaper revenue.
+  
+  
+  |
+  | **Keywords: Newpapers, ordinary least squares, regression, difference-in-difference, revenue ** 
+  
+  
+  
+  https://github.com/twolosha/SAT304-PS5
+
+## Introduction
+
+Quality sources of news are quintessential to society so that citizens are well-informed and politically active. Traditionally, a reputable source of information was from newspapers, an industry that is in trouble. Newspapers receive revenue from both readers and advertisements, but there is much competition for the latter. In the past 70 years, the revenue Newspapers obtained from advertisements has decreased sharply thanks to other media sources including television and the internet. 
+
+By recreating Angelucci and Cage's work "Newspapers in Times of Low Advertising Revenue", this paper will investigate the relationship between advertising revenues and newspapers' incline toward subscription based readership. To do so, historical archives were consulted to build a data set representing French newspapers from 1960 to 1974. Within this time period, a negative shock to the newspaper industry was felt through the introduction of television advertising. With a proportion of newspaper's advertising revenue being diverted, the affect on newspaper's quality will be investigated, with special attention to its readership demographics.  
+
+With advertisement revenues, two tiered pricing, quality and demographics in mind, ordinary least squares estimation will be employed to produce a model to help newspapers attract both readers and advertisers. 
+
+
+
+## Data
+
+Angellucci and Cage created the dataset through digitizing and amalgamating historical information regarding newspapers in France from 1960 to 1974. Sources for this data include the French Ministry of Information (for newspaper pricing, circulation and revenues), Commission de la carte d'identite des journalistes professionals (for number of journals per paper), Tarif Media (for advertising prices), French National Library (for amount of adverstising per issue) and Centre d'ETude des Supports de Publicite (for readership characteristics). Some variables, such as Newshole or percent of hard news, required examination of newspapers by Angelucci and Cage. 
+
+Of the newspapers in circulation during this time period, 61 local newspapers (87% of all local papers at the time) and 10 national newspapers (100% of the national papers at the time) make up the sample. This is a very strong representation of the newspapers operation at the time and provides an adequate sized sample for analysis.
+
+Important variables for our analysis will be the numerical, continuous  variables newspaper and advertisement sales. As demonstrated by figure 1 and 2, both types of revenue increase as the year increases from 1960 to 1974. For our purposes, local newspapers serve as a control when television advertising is offered because national newspapers will compete for the same ads. 
+
+
+```{r NP_Revenue, echo=FALSE, message=FALSE, warning=FALSE}
+cdat <- dat[-c(2:9,11,13:52)]
+cdat <- drop_na(cdat)
+year<- c("1960","1961", "1962", "1963", "1964", "1965","1966", "1967", "1968", "1969", "1970", "1971", "1972", "1973", "1974")
+year_costs<-(aggregate(cdat[-c(1)], by=list(cdat$year), FUN=sum)) 
+par(mfrow=c(2,1))
+barplot(year_costs$rs_cst, year_costs$Group.1, col = rainbow(20),main='Figure 1: Revenues from Newspaper Sales', cex.axis=0.5, cex.names=0.5, xlab="Years from 1960 to 1975", ylab="Constant (2014) Euros", names.arg=year)
+barplot(year_costs$ra_cst, year_costs$Group.1,col = rainbow(20),main='Figure 2: Revenues from Ad Sales in Newspapers', cex.axis=0.5, cex.names=0.5, xlab="Years from 1960 to 1975", ylab="Constant (2014) Euros", names.arg=year)
+
+```
+Since local newspapers tend to show ads for local businesses, it can be shown in Figure 3 that the advent of television advertising does not affect the increase in revenue from ad sales. For National newspapers however, the revenue from ad sales starts to decline a few years following the first offerings of television sales, as seen in Figure 4. 
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sdat <- dat[-c(2, 5:9,11,13:52)]
+sdat <-na.omit(sdat)
+sdatl <-filter(sdat, local == 1)
+sdatn <-filter(sdat, local == 0)
+sdatl<-(aggregate(sdatl[-c(2,3)], by=list(sdatl$year), FUN=sum)) 
+sdatn<-(aggregate(sdatn[-c(2,3)], by=list(sdatn$year), FUN=sum)) 
+
+barplot(sdatl$ra_cst, sdatl$Group.1,col = rainbow(20),main='Figure 3: Revenues from Ad Sales in Local Newspapers', cex.axis=0.5, cex.names=0.5, xlab="Years from 1960 to 1975", ylab="In constant (2014) Euros", names.arg=year)
+
+
+barplot(sdatn$ra_cst, sdatn$Group.1,col = rainbow(20),main='Figure 4: Revenues from Ad Sales in National Newspapers', cex.axis=0.5, cex.names=0.5, xlab="Years from 1960 to 1975", ylab="In constant (2014) Euros", names.arg=year)
+
+
+```
+Another key factor in our data is the number of journalists, which serves as a marker of newspaper quality. From Figure 5, it is clear that national newspapers tend to have more journalists than local newspapers accross the surveyed time period. 
+
+```{r Journalists, echo=FALSE, message=FALSE, warning=FALSE}
+jdat <- dat[-c(2, 5:14, 16:52)]
+jdat <- drop_na(jdat)
+
+#jdat2 <-filter(jdat, local==1)
+jdat2<-(aggregate(jdat, by=list(jdat$year, jdat$local), mean)) 
+
+#jnumnat <-filter(jdat, local==0)
+#jnumnat<-(aggregate(jnumnat[-c(2,3)], by=list(jnumnat$year), mean)) 
+
+
+ggplot(data = jdat2) + 
+  geom_point(mapping = aes(x = year, y =  nb_journ, color=factor(Group.2))) +
+  xlab("Year") +
+  ylab("Number of Journalists per Newspaper") +
+  ggtitle("Figure 5: Average Number of Journalists at Local Versus National Newspapers") +
+  theme(plot.title = element_text(size = 10, face = "bold"))
+
+
+
+```
+
+
+While the data is very extensive considering the number of relevant variables that the authors were able to collect, some of the variables may be biased. Those that have to be determined by the author as hard or soft news can be biased or hard to determine. The rest of the data is expected to be of high quality since the sources are reputable government agencies.
+
+
+## Model
+
+\begin{equation}
+ln(y_{n,t}) = \beta_0 + \beta_1(National Dummy * Post Shock Dummy) + \lambda_n + \gamma_y +\epsilon
+\end{equation}
+
+An Ordinary Least Squares (OLS) Regression Model was created in R to create an equation that could model several variables of interest.  If interested in the advertising side of the business, y could be the place holder for ad space, ad sales or ad revenue. Simultaneously, y could be newspaper sales, subscription price, etc..
+
+'National Dummy' is the marker for national newspaper (vs local) and 'Post Shock Dummy' is the dummy variable for after 1967. The beta1 variable is the measure of the effect of the shock on national papers per year compared to local papers. Lamba is the fixed effect of newspaper, Gamma is the fixed effect for time and epsilon represents the error term.
+
+The model was produced using the difference in differences (DID) statistical technique. The affect of the negative shock by the introduction of the newspaper ads was studied by using the local papers as a control and the national papers (competing for the ad revenue) as a treatment group. 
+
+
+## Results
+
+
+
+```{r model, echo=FALSE, message=FALSE, warning=FALSE}
+newspapers <- 
+  dat %>% 
+  mutate(ra_cst_div_qtotal = ra_cst / qtotal) %>% # An advertising side dependents needs to be built
+  mutate_at(vars(id_news, after_national, local, national), ~as.factor(.)) %>% # Change some to factors
+  mutate(year = as.integer(year))
+
+# Advertising side
+ad_revenue <- lm(log(ra_cst) ~ after_national + id_news + year, data = newspapers)
+ad_revenue_div_circulation <- lm(log(ra_cst_div_qtotal) ~ after_national + id_news + year, data = newspapers)
+ad_price <- lm(log(ads_p4_cst) ~ after_national + id_news + year, data = newspapers)
+ad_space <- lm(log(ads_s) ~ after_national + id_news + year, data = newspapers)
+
+omit_me <- c("(Intercept)", "id_news3", "id_news6", "id_news7", "id_news13", 
+             "id_news16", "id_news25", "id_news28", "id_news34", "id_news38", 
+             "id_news44", "id_news48", "id_news51", "id_news53", "id_news54", 
+             "id_news57", "id_news60", "id_news62", "id_news66", "id_news67", 
+             "id_news70", "id_news71", "id_news72", "id_news80", "id_news82", 
+             "id_news88", "id_news95", "id_news97", "id_news98", "id_news103", 
+             "id_news105", "id_news106", "id_news118", "id_news119", "id_news127", 
+             "id_news136", "id_news138", "id_news148", "id_news151", "id_news153", 
+             "id_news154", "id_news157", "id_news158", "id_news161", "id_news163", 
+             "id_news167", "id_news169", "id_news179", "id_news184", "id_news185", 
+             "id_news187", "id_news196", "id_news206", "id_news210", "id_news212", 
+             "id_news213", "id_news224", "id_news225", "id_news234", "id_news236", 
+             "id_news245", "id_news247", "id_news310", "id_news452", "id_news467", 
+             "id_news469", "id_news480", "id_news20040", "id_news20345", 
+             "id_news20346", "id_news20347", "id_news20352", "id_news20354", 
+             "id_news21006", "id_news21025", "id_news21173", "id_news21176", 
+             "id_news33718", "id_news34689", "id_news73")
+cat("Table 1: Response of Ad Related Variables in Newspapers After 1967")
+
+huxreg("Ad. rev." = ad_revenue, 
+       "Ad rev. div. circ." = ad_revenue_div_circulation, 
+       "Ad price" = ad_price, 
+       "Ad space" = ad_space,
+        omit_coefs = omit_me, 
+        number_format = 2
+        )
+
+```
+From Table 1, it can be observed that following the introduction of ads on television (in 1967), the price of ads and ad revenues made by newspapers significantly decreased. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# Consumer side
+subscription_price <- lm(log(ps_cst) ~ after_national + id_news + year, data = newspapers)
+unit_price <- lm(log(po_cst) ~ after_national + id_news + year, data = newspapers)
+circulation <- lm(log(qtotal) ~ after_national + id_news + year, data = newspapers)
+share_of_sub <- lm(log(qs_s) ~ after_national + id_news + year, data = newspapers)
+revenue_from_sales <- lm(log(rs_cst) ~ after_national + id_news + year, data = newspapers)
+
+cat("Table 2: Response of Newspaper Sale Prices and Revenue After 1967")
+huxreg("Subscription Price" = subscription_price, 
+       "Kiosk Price" = unit_price, 
+       "No. of Papers" = circulation, 
+       "Sales Revenue" = revenue_from_sales,
+       "Share of Subscriptions" = share_of_sub,
+        omit_coefs = omit_me, 
+        number_format = 2
+        )
+```
+As noted by Table 2, our model determined that the subscription price of newspapers and number of papers sold significantly decreased. Conversely, kiosk price and share of subscriptions positively increased. This is to be expected from the data as Figure 6 and 7demonstrates that for national newspapers, the price per unit at the kiosk (blue line) increases faster then subscription price (red line) following 1967 while the local prices remain coupled.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+pdat <- dat[-c(2, 4:6, 9:52)]
+pdat <-na.omit(pdat)
+pdatl <-filter(pdat, local == 1)
+pdatn <-filter(pdat, local == 0)
+pdatl<-(aggregate(pdatl, by=list(pdatl$year), FUN=mean)) 
+pdatn<-(aggregate(pdatn, by=list(pdatn$year), FUN=mean)) 
+
+
+ggplot(pdatn, aes(x=year)) + 
+  geom_line(aes(y = ps_cst), color = "darkred") + 
+  geom_line(aes(y = po_cst), color="steelblue", linetype="twodash") +
+  labs(title="Figure 6: Subscription and Kiosk Prices of National Newspapers from 1960 to 1974",
+        x ="Year", y = "Cost of Newspaper in Euros")
+
+ggplot(pdatl, aes(x=year)) + 
+  geom_line(aes(y = ps_cst), color = "darkred") + 
+  geom_line(aes(y = po_cst), color="steelblue", linetype="twodash") +
+  labs(title="Figure 7: Subscription and Kiosk Prices of Local Newspapers from 1960 to 1974",
+        x ="Year", y = "Cost of Newspaper in Euros")
+
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Readership
+
+primary <- lm(R_sh_edu_primaire_ipo ~ after_national + id_news + year, data = newspapers)
+secondary <- lm(R_sh_edu_secondaire_ipo ~ after_national + id_news + year, data = newspapers)
+no_edu <- lm(R_sh_edu_no_ipo ~ after_national + id_news + year, data = newspapers)
+farmer <- lm(R_sh_pcs_agri_ipo ~ after_national + id_news + year, data = newspapers)
+patron <- lm(R_sh_pcs_patron_ipo ~ after_national + id_news + year, data = newspapers)
+cadre <- lm(R_sh_pcs_cadre_ipo ~ after_national + id_news + year, data = newspapers)
+labourer <- lm(R_sh_pcs_ouvriers_ipo ~ after_national + id_news + year, data = newspapers)
+professional <- lm(R_sh_edu_sup_prof_ipo ~ after_national + id_news + year, data = newspapers)
+unemployed <- lm(R_sh_pcs_inactifs_ipo ~ after_national + id_news + year, data = newspapers)
+cat("Table 3: How Readers of Various Educational Backgrounds Changed After 1967")
+huxreg("Primary" = primary, 
+       "Secondary Education" = secondary, 
+       "Professional Position" = professional,
+       "No Education" = no_edu, 
+        omit_coefs = omit_me, 
+        number_format = 2
+        )
+```
+Table 3 demonstrates that significantly increased readship was observed only in readers with primary school education only. Readership from individuals with secondary education was significantly decreased following 1967. No significant change was observed in readership from those holding professional degrees or with no formal education.    
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cat("Table 5: How Readers of Various Employment Backgrounds Changed After 1967")
+huxreg("Farmer" = farmer, 
+       "Shopkeeper" = patron, 
+       "Employee" = cadre, 
+       "Labourer" = labourer,
+       "Unemployed" = unemployed,
+        omit_coefs = omit_me, 
+        number_format = 2
+        )
+
+```
+Significant increases in readership are observed in Farming and Labour professions following the introduction of television ads. A significant decrease is observed in the general 'Employee' group.  
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Measures of Quality
+
+pagesNo <-lm(ln_pages ~ after_national + id_news + year, data = newspapers) 
+hardnewsP <-lm(ln_share_Hard ~ after_national + id_news + year, data = newspapers)
+journalistNO <-lm(log(nb_journ) ~ after_national + id_news + year, data = newspapers)
+newshole <-lm(log(news_hole) ~ after_national + id_news + year, data = newspapers)
+payrollAvg <-lm(ln_av_payroll_cst ~ after_national + id_news + year, data = newspapers) 
+cat("Table 6: How Indicators of Newspaper Quality Changed Following 1967")
+huxreg("# of Pages" = pagesNo, 
+       "% of Hard News" = hardnewsP, 
+       "# of Journalists" = journalistNO, 
+       "Newshole" = newshole,
+       "Average Payroll" = payrollAvg,
+        omit_coefs = omit_me, 
+        number_format = 2
+        )
+
+
+
+
+```
+Finally, a significant decrease in the number of journalists is present following 1967 while other measures of quality do not appear to change significantly. 
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+## Discussion
+
+In line with Angelucci and Cage, this paper demonstrates that the decrease in Ad Revenue experienced by newspapers leads to a two tiered pricing discrimination in favour of subscriptions. Since the motivating event was the introduction of television ad sales in 1967, local newspapers served as a control as mainly national newspapers were competing for the same ad revenue. 
+
+After 1976, the difference in price between subscription and kiosk purchased newspapers significantly increased. Figure 7 demonstrated that the largest changes occurred in national newspapers. Promoting subscriptions is beneficial to newspapers as it is coupled to guaranteed sales revenue and increased readership (attractive to ad buyers). While total percent of subscriptions did increase, total newspapers purchased slightly decreased, thus less kiosk purchasers (and less sales revenue). Unfortunately for newspapers, Ad revenues also decreased following the introduction of television ads, even while maintaining the same ad space (since the price of ads were lower). 
+
+How did this decrease in revenue affect quality? While number of pages, percentage of hard news and newshole all remained significantly unchanged, a significant decrease was observed in the number of journalists. Figure five shows while the number of journalists employed by local papers steadily increases throughout the time period, following 1967, the number of journalists at national papers starts to decrease. This shows that less journalists are producing the same quantity per newspaper, which could mean a decrease in quality. Clearly hard hitting investigative journalism is expensive and requires a certain amount of man hours put forth by journalists. 
+
+Weaknesses in this paper are that the time period is older and readership could have changed with the popularity of the internet, wifi availability, expansion of television etc.. Even the number of news sources as expanded to include social media. Further, there are more and more competitors for ad sales compared to the 70s. A model to explain newspaper readership and pricing is likely to be much more complex and more variables will be needed. 
+
+Another weakness is that the newspaper types (local and national) are lumped together during the regression, even though the event tends to hit national ad revenues and not local. While changes were not observed in factors representing quality such as newshole or hard news percentage, if the data sets were split to represent local and national, changes may be found. While there are not enough national newspapers to warrant a sample, expanding the data to include other countries would help create a larger sample and the results could be extrapolated further than just France.  
+
+
+
+# References
+
+- R Core Team (2020). R: A language and environment for statistical computing. R, Foundation for Statistical Computing,   Vienna, Austria. URL, https://www.R-project.org/.
+
+- Wickham et al., (2019). Welcome to the tidyverse. Journal of Open Source Software, 4(43), 1686,    https://doi.org/10.21105/joss.01686
+
+- Hadley Wickham and Evan Miller (2020). haven: Import and Export 'SPSS', 'Stata' and 'SAS' Files. R package
+  version 2.3.1. https://CRAN.R-project.org/package=haven
+
+- Hadley Wickham, Romain François, Lionel Henry and Kirill Müller (2020). dplyr: A Grammar of Data
+  Manipulation. R package version 1.0.2. https://CRAN.R-project.org/package=dplyr
+  
+- H. Wickham. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+
+- Charles Angelucci and Julia Cagé (2019). Newspapers in Times of Low Advertising Revenues. URL,   https://doi.org/10.1257/mic.20170306
+
+- Angelucci, Charles, and Julia Cagé, 2019, ‘Newspapers in times of low advertising revenues’,
+American Economic Journal: Microeconomics, https://www.openicpsr.org/openicpsr/project/116438/version/V1/view.
+
+- Alexander Rohan https://www.tellingstorieswithdata.com/06-03-matching_and_differences.html#results
+
+- Hugh-Jones, David, 2020, huxtable: Easily Create and Style Tables for LaTeX, HTML and Other Formats, R package version 5.1.1. https://CRAN.R-project.org/package=huxtable
